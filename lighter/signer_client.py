@@ -53,6 +53,7 @@ def get_signer():
     if __signer is not None:
         return __signer
     __signer = __SignerInstance()
+    return __signer
 
 
 def create_api_key(seed=""):
