@@ -36,8 +36,8 @@ async def main():
     tx, tx_hash, err = await client.create_order(
         market_index=0,
         client_order_index=123,
-        base_amount=100000,
-        price=405000,
+        base_amount=1000,  # 0.1 ETH
+        price=405000,  # $4050
         is_ask=True,
         order_type=lighter.SignerClient.ORDER_TYPE_LIMIT,
         time_in_force=lighter.SignerClient.ORDER_TIME_IN_FORCE_GOOD_TILL_TIME,
@@ -48,8 +48,15 @@ async def main():
     if err is not None:
         raise Exception(err)
 
-    auth, err = client.create_auth_token_with_expiry(lighter.SignerClient.DEFAULT_10_MIN_AUTH_EXPIRY)
-    print(f"{auth=}")
+    # create order
+    tx, tx_hash, err = await client.modify_order(
+        market_index=0,
+        order_index=123,
+        base_amount=1100,  # 0.11 ETH
+        price=410000,  # $4100
+        trigger_price=0,
+    )
+    print(f"Modify Order {tx=} {tx_hash=} {err=}")
     if err is not None:
         raise Exception(err)
 
