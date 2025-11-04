@@ -409,20 +409,17 @@ class SignerClient:
                 raise Exception("ambiguous api key")
         return self.nonce_manager.next_nonce()
 
-    def __signer_create_auth_token(self, deadline):
-        result = self.signer.CreateAuthToken(deadline)
-
-        auth = result.str.decode("utf-8") if result.str else None
-        error = result.err.decode("utf-8") if result.err else None
-        return auth, error
-
     def create_auth_token_with_expiry(self, deadline: int = DEFAULT_10_MIN_AUTH_EXPIRY, *, timestamp: int = None):
         if deadline == SignerClient.DEFAULT_10_MIN_AUTH_EXPIRY:
             deadline = 10 * SignerClient.MINUTE
         if timestamp is None:
             timestamp = int(time.time())
 
-        return self.__signer_create_auth_token(timestamp + deadline)
+        result = self.signer.CreateAuthToken(deadline)
+
+        auth = result.str.decode("utf-8") if result.str else None
+        error = result.err.decode("utf-8") if result.err else None
+        return auth, error
 
     def sign_change_api_key(self, eth_private_key: str, new_pubkey: str, nonce: int = -1):
         return self.__decode_and_sign_tx_info(eth_private_key, self.TX_TYPE_CHANGE_PUB_KEY, self.signer.SignChangePubKey(
@@ -468,6 +465,59 @@ class SignerClient:
             nonce,
         ))
 
+    def sign_create_grouped_orders(
+            self,
+            grouping_type: int,
+            orders: List[CreateOrderTxReq],
+            nonce: int = -1,
+    ):
+        arr_type = CreateOrderTxReq * len(orders)
+        orders_arr = arr_type(*orders)
+
+        return self.__decode_tx_info(self.TX_TYPE_CREATE_GROUP_ORDER, self.signer.SignCreateGroupedOrders(
+            grouping_type, orders_arr, len(orders), nonce
+        ))
+
+    def sign_cancel_order(self, market_index: int, order_index: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_CANCEL_ORDER, self.signer.SignCancelOrder(market_index, order_index, nonce))
+
+    def sign_withdraw(self, usdc_amount: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_WITHDRAW, self.signer.SignWithdraw(usdc_amount, nonce))
+
+    def sign_create_sub_account(self, nonce=-1):
+        return self.__decode_tx_info(self.TX_TYPE_CREATE_SUB_ACCOUNT, self.signer.SignCreateSubAccount(nonce))
+
+    def sign_cancel_all_orders(self, time_in_force: int, timestamp_ms: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_CANCEL_ALL_ORDERS, self.signer.SignCancelAllOrders(time_in_force, timestamp_ms, nonce))
+
+    def sign_modify_order(self, market_index: int, order_index: int, base_amount: int, price: int, trigger_price: int = NIL_TRIGGER_PRICE, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_MODIFY_ORDER,
+                                     self.signer.SignModifyOrder(market_index, order_index, base_amount, price, trigger_price, nonce))
+
+    def sign_transfer(self, eth_private_key: str, to_account_index: int, usdc_amount: int, fee: int, memo: str, nonce: int = -1):
+        return self.__decode_and_sign_tx_info(eth_private_key, self.TX_TYPE_TRANSFER,
+                                              self.signer.SignTransfer(to_account_index, usdc_amount, fee, ctypes.c_char_p(memo.encode("utf-8")), nonce))
+
+    def sign_create_public_pool(self, operator_fee: int, initial_total_shares: int, min_operator_share_rate: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_CREATE_PUBLIC_POOL,
+                                     self.signer.SignCreatePublicPool(operator_fee, initial_total_shares, min_operator_share_rate, nonce))
+
+    def sign_update_public_pool(self, public_pool_index: int, status: int, operator_fee: int, min_operator_share_rate: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_UPDATE_PUBLIC_POOL,
+                                     self.signer.SignUpdatePublicPool(public_pool_index, status, operator_fee, min_operator_share_rate, nonce))
+
+    def sign_mint_shares(self, public_pool_index: int, share_amount: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_MINT_SHARES, self.signer.SignMintShares(public_pool_index, share_amount, nonce))
+
+    def sign_burn_shares(self, public_pool_index: int, share_amount: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_BURN_SHARES, self.signer.SignBurnShares(public_pool_index, share_amount, nonce))
+
+    def sign_update_leverage(self, market_index: int, fraction: int, margin_mode: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_UPDATE_LEVERAGE, self.signer.SignUpdateLeverage(market_index, fraction, margin_mode, nonce))
+
+    def sign_update_margin(self, market_index: int, usdc_amount: int, direction: int, nonce: int = -1):
+        return self.__decode_tx_info(self.TX_TYPE_UPDATE_MARGIN, self.signer.SignUpdateMargin(market_index, usdc_amount, direction, nonce))
+
     @process_api_key_and_nonce
     async def create_order(
             self,
@@ -504,19 +554,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Create Order Send Tx Response: {api_response}")
         return CreateOrder.from_json(tx_info), api_response, None
-
-    def sign_create_grouped_orders(
-            self,
-            grouping_type: int,
-            orders: List[CreateOrderTxReq],
-            nonce: int = -1,
-    ):
-        arr_type = CreateOrderTxReq * len(orders)
-        orders_arr = arr_type(*orders)
-
-        return self.__decode_tx_info(self.TX_TYPE_CREATE_GROUP_ORDER, self.signer.SignCreateGroupedOrders(
-            grouping_type, orders_arr, len(orders), nonce
-        ))
 
     @process_api_key_and_nonce
     async def create_grouped_orders(
@@ -647,9 +684,6 @@ class SignerClient:
             api_key_index=api_key_index,
         )
 
-    def sign_cancel_order(self, market_index: int, order_index: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_CANCEL_ORDER, self.signer.SignCancelOrder(market_index, order_index, nonce))
-
     @process_api_key_and_nonce
     async def cancel_order(self, market_index, order_index, nonce=-1, api_key_index=-1) -> (CancelOrder, TxHash, str):
         tx_type, tx_info, error = self.sign_cancel_order(market_index, order_index, nonce)
@@ -730,9 +764,6 @@ class SignerClient:
             api_key_index,
         )
 
-    def sign_withdraw(self, usdc_amount: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_WITHDRAW, self.signer.SignWithdraw(usdc_amount, nonce))
-
     @process_api_key_and_nonce
     async def withdraw(self, usdc_amount, nonce=-1, api_key_index=-1) -> (Withdraw, TxHash):
         usdc_amount = int(usdc_amount * self.USDC_TICKER_SCALE)
@@ -746,9 +777,6 @@ class SignerClient:
         logging.debug(f"Withdraw Send Tx Response: {api_response}")
         return Withdraw.from_json(tx_info), api_response, None
 
-    def sign_create_sub_account(self, nonce=-1):
-        return self.__decode_tx_info(self.TX_TYPE_CREATE_SUB_ACCOUNT, self.signer.SignCreateSubAccount(nonce))
-
     async def create_sub_account(self, nonce=-1):
         tx_type, tx_info, error = self.sign_create_sub_account(nonce)
         if error is not None:
@@ -758,9 +786,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Create Sub Account Send Tx Response: {api_response}")
         return tx_info, api_response, None
-
-    def sign_cancel_all_orders(self, time_in_force: int, timestamp_ms: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_CANCEL_ALL_ORDERS, self.signer.SignCancelAllOrders(time_in_force, timestamp_ms, nonce))
 
     @process_api_key_and_nonce
     async def cancel_all_orders(self, time_in_force, timestamp_ms, nonce=-1, api_key_index=-1):
@@ -772,10 +797,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Cancel All Orders Send Tx Response: {api_response}")
         return tx_info, api_response, None
-
-    def sign_modify_order(self, market_index: int, order_index: int, base_amount: int, price: int, trigger_price: int = NIL_TRIGGER_PRICE, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_MODIFY_ORDER,
-                                     self.signer.SignModifyOrder(market_index, order_index, base_amount, price, trigger_price, nonce))
 
     @process_api_key_and_nonce
     async def modify_order(
@@ -790,10 +811,6 @@ class SignerClient:
         logging.debug(f"Modify Order Send Tx Response: {api_response}")
         return tx_info, api_response, None
 
-    def sign_transfer(self, eth_private_key: str, to_account_index: int, usdc_amount: int, fee: int, memo: str, nonce: int = -1):
-        return self.__decode_and_sign_tx_info(eth_private_key, self.TX_TYPE_TRANSFER,
-                                              self.signer.SignTransfer(to_account_index, usdc_amount, fee, ctypes.c_char_p(memo.encode("utf-8")), nonce))
-
     @process_api_key_and_nonce
     async def transfer(self, eth_private_key: str, to_account_index, usdc_amount, fee, memo, nonce=-1, api_key_index=-1):
         usdc_amount = int(usdc_amount * self.USDC_TICKER_SCALE)
@@ -806,10 +823,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Transfer Send Tx Response: {api_response}")
         return tx_info, api_response, None
-
-    def sign_create_public_pool(self, operator_fee: int, initial_total_shares: int, min_operator_share_rate: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_CREATE_PUBLIC_POOL,
-                                     self.signer.SignCreatePublicPool(operator_fee, initial_total_shares, min_operator_share_rate, nonce))
 
     @process_api_key_and_nonce
     async def create_public_pool(
@@ -826,10 +839,6 @@ class SignerClient:
         logging.debug(f"Create Public Pool Send Tx Response: {api_response}")
         return tx_info, api_response, None
 
-    def sign_update_public_pool(self, public_pool_index: int, status: int, operator_fee: int, min_operator_share_rate: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_UPDATE_PUBLIC_POOL,
-                                     self.signer.SignUpdatePublicPool(public_pool_index, status, operator_fee, min_operator_share_rate, nonce))
-
     @process_api_key_and_nonce
     async def update_public_pool(
             self, public_pool_index, status, operator_fee, min_operator_share_rate, nonce=-1, api_key_index=-1
@@ -845,9 +854,6 @@ class SignerClient:
         logging.debug(f"Update Public Pool Send Tx Response: {api_response}")
         return tx_info, api_response, None
 
-    def sign_mint_shares(self, public_pool_index: int, share_amount: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_MINT_SHARES, self.signer.SignMintShares(public_pool_index, share_amount, nonce))
-
     @process_api_key_and_nonce
     async def mint_shares(self, public_pool_index, share_amount, nonce=-1, api_key_index=-1):
         tx_type, tx_info, error = self.sign_mint_shares(public_pool_index, share_amount, nonce)
@@ -859,9 +865,6 @@ class SignerClient:
         logging.debug(f"Mint Shares Send Tx Response: {api_response}")
         return tx_info, api_response, None
 
-    def sign_burn_shares(self, public_pool_index: int, share_amount: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_BURN_SHARES, self.signer.SignBurnShares(public_pool_index, share_amount, nonce))
-
     @process_api_key_and_nonce
     async def burn_shares(self, public_pool_index, share_amount, nonce=-1, api_key_index=-1):
         tx_type, tx_info, error = self.sign_burn_shares(public_pool_index, share_amount, nonce)
@@ -872,9 +875,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Burn Shares Send Tx Response: {api_response}")
         return tx_info, api_response, None
-
-    def sign_update_leverage(self, market_index: int, fraction: int, margin_mode: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_UPDATE_LEVERAGE, self.signer.SignUpdateLeverage(market_index, fraction, margin_mode, nonce))
 
     @process_api_key_and_nonce
     async def update_leverage(self, market_index, margin_mode, leverage, nonce=-1, api_key_index=-1):
@@ -888,9 +888,6 @@ class SignerClient:
         api_response = await self.send_tx(tx_type=tx_type, tx_info=tx_info)
         logging.debug(f"Update Leverage Tx Response: {api_response}")
         return tx_info, api_response, None
-
-    def sign_update_margin(self, market_index: int, usdc_amount: int, direction: int, nonce: int = -1):
-        return self.__decode_tx_info(self.TX_TYPE_UPDATE_MARGIN, self.signer.SignUpdateMargin(market_index, usdc_amount, direction, nonce))
 
     @process_api_key_and_nonce
     async def update_margin(self, market_index: int, usdc_amount: float, direction: int, nonce: int = -1):
