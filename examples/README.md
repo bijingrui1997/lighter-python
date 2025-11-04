@@ -5,35 +5,31 @@
   - this will require you to enter your Ethereum private key
   - the eth private key will only be used in the Py SDK to sign a message
   - the eth private key is not required in order to trade on the platform
-  - the eth private key is not passed to the binary
-  - save the output of the script as you'll need to use it on all scripts 
-  - the output should look like
-```
-BASE_URL = 'https://testnet.zklighter.elliot.ai'
-API_KEY_PRIVATE_KEY = '0xea5d2eca5be67eca056752eaf27b173518b8a5550117c09d2b58c7ea7d306cc4426f913ccf27ab19'
-ACCOUNT_INDEX = 595
-API_KEY_INDEX = 1
-```
+  - the eth private key is not passed to the binary 
+  - the API key config is saved in a local file `./api_key_config.json`
+
 ## Start trading on testnet
-For each example, you'll need to setup the base url / api_key_private_key / account_index and api_key index using the output of the `setup.py`
-
-  - `create_modify_cancel_order.py`
-    - creates an ask (sell) order for 0.1 ETH @ $4050
-    - modified the order and increases the size to 0.11 ETH and increases the price to $4100
-    - cancels the order
-    - Note: all of these operations use the client order index of the order. You can use the order from the exchange as well
+- `create_modify_cancel_order.py`
+  - creates an ask (sell) order for 0.1 ETH @ $4050
+  - modified the order and increases the size to 0.11 ETH and increases the price to $4100
+  - cancels the order
+  - Note: all of these operations use the client order index of the order. You can use the order from the exchange as well
   
-  - `create_grouped_ioc_with_attached_sl_tp.py`
-    - creates an ask (sell) IoC order for 0.1 ETH
-    - along w/ the order, it sets up a Stop Loss (SL) and a Take Profit (TP) order for the whole size of the order
-    - the size of the SL/TP will be equal to the executed size of the order
-    - the SL/TP orders are canceled when the sign of your position changes
+- `ws_send_tx.py`
+  - same flow as `create_modify_cancel_order.py`
+  - sends TXs over WS instead of HTTP
 
-  - `create_position_tied_sl_tl.py`
-    - creates a bid (buy) Stop Loss (SL) and a Take Profit (TP) to close your short position
-    - the size of the orders will be for your whole position (because BaseAmount=0)
-    - the orders will grow / shrink as you accumulate more position
-    - the SL/TP orders are canceled when the sign of your position changes
+- `create_grouped_ioc_with_attached_sl_tp.py`
+  - creates an ask (sell) IoC order for 0.1 ETH
+  - along w/ the order, it sets up a Stop Loss (SL) and a Take Profit (TP) order for the whole size of the order
+  - the size of the SL/TP will be equal to the executed size of the order
+  - the SL/TP orders are canceled when the sign of your position changes
+
+- `create_position_tied_sl_tl.py`
+  - creates a bid (buy) Stop Loss (SL) and a Take Profit (TP) to close your short position
+  - the size of the orders will be for your whole position (because BaseAmount=0)
+  - the orders will grow / shrink as you accumulate more position
+  - the SL/TP orders are canceled when the sign of your position changes
 
 ### On SL/TP orders
 SL/TP orders need to be configured beyond just setting the trigger price. When the trigger price is set, 
@@ -43,7 +39,9 @@ You want to set up a take profit at $120'000
 - order should be an ask (sell) order, to close your position
 - the trigger price should be $120'000
 
-What about the order type
+What about the order types? Just as normal orders, SL/TP orders trigger an order, which can be:
+- market order
+- limit IOC / GTC
 
 ## Setup steps for mainnet
 - deposit money on Lighter to create an account first
