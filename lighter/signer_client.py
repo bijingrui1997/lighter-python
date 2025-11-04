@@ -335,39 +335,21 @@ class SignerClient:
             private_keys[self.api_key_index] = private_key
         return private_keys
 
-    def __signer_create_client(
-            self,
-            url: str,
-            api_private_key: str,
-            chain_id: int,
-            api_key_index: int,
-            account_index: int,
-    ) -> Optional[str]:
-        err = self.signer.CreateClient(
-            url.encode("utf-8"),
-            api_private_key.encode("utf-8"),
-            chain_id,
-            api_key_index,
-            account_index,
-        )
-
-        if err is None:
-            return
-
-        raise err.decode("utf-8")
-
     def create_client(self, api_key_index=None):
         api_key_index = api_key_index or self.api_key_index
-        err = self.__signer_create_client(
-            self.url,
-            self.api_key_dict[api_key_index],
+        err = self.signer.CreateClient(
+            self.url.encode("utf-8"),
+            self.api_key_dict[api_key_index].encode("utf-8"),
             self.chain_id,
             api_key_index,
             self.account_index,
         )
 
+        if err is None:
+            return
+
         if err is not None:
-            raise Exception(err)
+            raise Exception(err.decode("utf-8"))
 
     def __signer_check_client(
             self,
@@ -388,12 +370,9 @@ class SignerClient:
                 return err + f" on api key {self.api_key_index}"
         return None
 
-    def __signer_switch_api_key(self, api_key_index: int) -> Optional[str]:
-        result = self.signer.SwitchAPIKey(api_key_index)
-        return result.decode("utf-8") if result else None
-
     def switch_api_key(self, api_key: int):
-        return self.__signer_switch_api_key(api_key)
+        err = self.signer.SwitchAPIKey(api_key)
+        return err.decode("utf-8") if err else None
 
     @staticmethod
     def create_api_key(self, seed=""):
