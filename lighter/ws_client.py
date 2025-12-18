@@ -1,4 +1,5 @@
 import json
+import ssl
 from websockets.sync.client import connect
 from websockets.client import connect as connect_async
 from lighter.configuration import Configuration
@@ -151,14 +152,24 @@ class WsClient:
         raise Exception(f"Closed: {close_status_code} {close_msg}")
 
     def run(self):
-        ws = connect(self.base_url)
+        # 创建SSL上下文（用于通过代理连接或测试环境）
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        ws = connect(self.base_url, ssl=ssl_context)
         self.ws = ws
 
         for message in ws:
             self.on_message(ws, message)
 
     async def run_async(self):
-        ws = await connect_async(self.base_url)
+        # 创建SSL上下文（用于通过代理连接或测试环境）
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        ws = await connect_async(self.base_url, ssl=ssl_context)
         self.ws = ws
 
         async for message in ws:
