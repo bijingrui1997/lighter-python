@@ -1,7 +1,9 @@
 import json
 import ssl
 from websockets.sync.client import connect
-from websockets.client import connect as connect_async
+# 修复：使用新版 websockets.connect 而非已弃用的 websockets.client.connect
+# websockets 15.x 中 websockets.client.connect 已被弃用，应使用 websockets.connect
+from websockets import connect as connect_async
 from lighter.configuration import Configuration
 
 class WsClient:
